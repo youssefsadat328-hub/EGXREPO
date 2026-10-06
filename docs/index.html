@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EGX Stock Scorer</title>
+<meta name="description" content="Search any Egyptian Exchange stock and see how it scores on profit growth, valuation, speculation and chart red flags.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#f2f5f6; --panel:#ffffff; --ink:#13232c; --ink2:#4a5d68; --muted:#6c7e89;
+  --line:#d9e1e5; --accent:#0d6b6b; --accent-ink:#ffffff;
+  --bar:#0d6b6b; --bar-track:#e3eaed; --mid:#13232c;
+  --good:#1d7a46; --warn:#a15c00; --bad:#b3261e;
+  --focus:#1a5fd0;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1a20; --panel:#15262e; --ink:#e8f0f3; --ink2:#a9bcc5; --muted:#8aa0ab;
+    --line:#274149; --accent:#4cc3c0; --accent-ink:#0e1a20;
+    --bar:#4cc3c0; --bar-track:#223840; --mid:#e8f0f3;
+    --good:#58c98a; --warn:#e5a444; --bad:#ff8a80; --focus:#7ab0ff;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1a20; --panel:#15262e; --ink:#e8f0f3; --ink2:#a9bcc5; --muted:#8aa0ab;
+  --line:#274149; --accent:#4cc3c0; --accent-ink:#0e1a20;
+  --bar:#4cc3c0; --bar-track:#223840; --mid:#e8f0f3;
+  --good:#58c98a; --warn:#e5a444; --bad:#ff8a80; --focus:#7ab0ff;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px 64px}
+header{padding:40px 0 20px}
+h1{font-size:clamp(1.9rem,5vw,2.8rem);line-height:1.1;margin:0 0 10px;font-weight:700;letter-spacing:-.02em}
+.lede{margin:0;color:var(--ink2);max-width:62ch}
+.search{position:relative;margin:22px 0 8px}
+.search input{width:100%;font:inherit;font-size:1.1rem;padding:16px 16px 16px 16px;border:2px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+.search input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 35%,transparent)}
+.suggest{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:0;padding:4px;list-style:none;z-index:5;max-height:340px;overflow:auto;box-shadow:0 12px 30px rgba(0,0,0,.14)}
+.suggest li{display:flex;gap:12px;align-items:baseline;padding:10px 12px;border-radius:6px;cursor:pointer}
+.suggest li[aria-selected="true"],.suggest li:hover{background:var(--bar-track)}
+.suggest b{min-width:64px}
+.suggest span{color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hint{color:var(--muted);font-size:.9rem;margin:6px 0 0}
+
+/* result */
+.result{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;margin:20px 0 0}
+.result[hidden]{display:none}
+.r-head{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:6px}
+.r-head h2{margin:0;font-size:1.5rem;line-height:1.2}
+.sym{color:var(--ink2);font-weight:600}
+.overall{text-align:right}
+.overall .n{font-size:2.6rem;font-weight:700;line-height:1;letter-spacing:-.03em}
+.overall .l{color:var(--muted);font-size:.85rem}
+.conf{display:inline-flex;gap:6px;align-items:center;font-weight:600;font-size:.9rem;margin-top:6px}
+.conf i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.conf.high i{background:var(--good)} .conf.medium i{background:var(--warn)} .conf.low i{background:var(--bad)}
+.measures{margin:22px 0 4px;display:grid;gap:18px}
+.m-top{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.m-name{font-weight:600}
+.m-val{font-weight:700;font-variant-numeric:tabular-nums}
+.m-val.na{color:var(--muted);font-weight:500}
+.track{position:relative;height:12px;background:var(--bar-track);border-radius:6px;margin-top:6px;overflow:hidden}
+.track.na{background:repeating-linear-gradient(135deg,var(--bar-track) 0 6px,transparent 6px 12px);outline:1px dashed var(--line);outline-offset:-1px}
+.fill{position:absolute;left:0;top:0;bottom:0;background:var(--bar);border-radius:0 4px 4px 0}
+.track::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--panel);opacity:.9}
+.m-desc{margin:4px 0 0;color:var(--ink2);font-size:.9rem}
+.notes{margin:20px 0 0;padding:12px 14px;border-left:4px solid var(--warn);background:var(--bar-track);border-radius:0 8px 8px 0;font-size:.92rem}
+.notes ul{margin:4px 0 0;padding-left:18px}
+.notes p{margin:4px 0 0}
+.notes.ctx{border-left-color:var(--accent)}
+.figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 20px;margin:22px 0 0;padding-top:18px;border-top:1px solid var(--line)}
+.figs dt{color:var(--muted);font-size:.82rem}
+.figs dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+.src{margin:16px 0 0;font-size:.88rem;color:var(--ink2)}
+
+/* table */
+.browse{margin-top:40px}
+.browse h2{font-size:1.3rem;margin:0 0 4px}
+.controls{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;margin:12px 0}
+.controls label{display:flex;gap:8px;align-items:center;font-size:.95rem}
+.controls input[type=number]{width:72px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.tablewrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+tbody tr:last-child td{border-bottom:0}
+th button{all:unset;cursor:pointer;font-weight:600;color:var(--ink);padding:2px 4px;border-radius:4px}
+th button:focus-visible{outline:3px solid var(--focus)}
+th[aria-sort="ascending"] button::after{content:" \25B2";font-size:.7em}
+th[aria-sort="descending"] button::after{content:" \25BC";font-size:.7em}
+td .tname{display:block;color:var(--ink2);font-size:.85rem;max-width:30ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td button.pick{all:unset;cursor:pointer;font-weight:700;color:var(--accent)}
+td button.pick:hover{text-decoration:underline}
+td button.pick:focus-visible{outline:3px solid var(--focus)}
+td.na{color:var(--muted)}
+.cdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.cdot.high{background:var(--good)} .cdot.medium{background:var(--warn)} .cdot.low{background:var(--bad)}
+.count{color:var(--muted);font-size:.9rem;margin:8px 0 0}
+.empty{padding:24px;text-align:center;color:var(--ink2)}
+
+footer{margin-top:40px;color:var(--ink2);font-size:.9rem}
+footer p{margin:0 0 10px;max-width:72ch}
+.error{background:var(--panel);border:1px solid var(--bad);border-radius:10px;padding:16px;margin-top:20px}
+@media (max-width:560px){.result{padding:18px}.overall{text-align:left}}
+@media (prefers-reduced-motion:no-preference){.fill{transition:width .45s ease}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>How does this EGX stock score?</h1>
+    <p class="lede">Type a ticker or company name. You get four 0–100 scores: profit growth, how cheap it is, how far it is from speculators, and chart red flags. Scores compare each stock with the rest of the exchange.</p>
+    <div class="search">
+      <input id="q" type="search" placeholder="Search, for example COMI or Elsewedy" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="sugg" aria-label="Search by ticker or company name">
+      <ul id="sugg" class="suggest" role="listbox" hidden></ul>
+    </div>
+    <p class="hint" id="asof"></p>
+  </header>
+
+  <main>
+    <div id="err" class="error" hidden></div>
+    <section id="result" class="result" hidden aria-live="polite"></section>
+
+    <section class="browse">
+      <h2>All stocks</h2>
+      <p class="hint">Sort by any column. Select a ticker to open its full breakdown.</p>
+      <div class="controls">
+        <label><input type="checkbox" id="onlyConf"> Hide low-confidence scores</label>
+        <label>Overall at least <input type="number" id="minOverall" min="0" max="100" value="0" inputmode="numeric"></label>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr id="thead"></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <p class="count" id="count"></p>
+    </section>
+  </main>
+
+  <footer>
+    <p><strong>This is a screening aid, not investment advice.</strong> A high score does not mean a stock will go up, and a low score does not mean it will fall. Check the numbers yourself before you decide anything.</p>
+    <p id="how">How scores work: each measure is ranked against the other EGX stocks (a score of 50 is typical, 90 is better than 90% of them). Profit growth is judged after Egyptian inflation. Cheapness uses P/E against similar companies and against the stock's own history. A stock marked low confidence is missing data or had a data warning.</p>
+    <p id="credit"></p>
+  </footer>
+</div>
+
+<script src="data/scores.js"></script>
+<script>
+(function(){
+  "use strict";
+  var MEASURES = [
+    {key:"profit_growth", name:"Profit growth", short:"Growth",
+     desc:"Yearly profit growth after inflation, and how many years profit beat inflation."},
+    {key:"undervalued", name:"Undervalued", short:"Value",
+     desc:"Low P/E compared with similar companies and its own history, plus dividend yield."},
+    {key:"away_from_speculators", name:"Away from speculators", short:"Calm",
+     desc:"Calm price moves, regular trading and low churn. Higher means fewer speculators."},
+    {key:"no_manipulation_flags", name:"No manipulation signs", short:"Clean chart",
+     desc:"Starts at 100 and loses points for each chart red flag, such as big jumps on thin volume."}
+  ];
+  var data = null, rows = [], sortKey = "overall", sortDir = -1, active = -1, shown = [];
+  var $ = function(id){return document.getElementById(id)};
+  var q=$("q"), sugg=$("sugg");
+
+  function el(tag, cls, text){var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e}
+  function fmt(v, d, suf){return v==null ? "not available" : Number(v).toFixed(d||0)+(suf||"")}
+  function egp(v){
+    if(v==null) return "not available";
+    if(v>=1e9) return (v/1e9).toFixed(1)+"B EGP";
+    if(v>=1e6) return (v/1e6).toFixed(1)+"M EGP";
+    return Math.round(v/1e3)+"K EGP";
+  }
+
+  // Online (GitHub Pages) the page reads data/scores.json. Opened by double-click (file://) browsers block that,
+  // so it falls back to data/scores.js, a copy of the same data that score_all.py writes next to it.
+  fetch("data/scores.json", {cache:"no-cache"}).then(function(r){
+    if(!r.ok) throw new Error("HTTP "+r.status); return r.json();
+  }).catch(function(e){
+    if(window.EGX_SCORES) return window.EGX_SCORES;
+    throw e;
+  }).then(function(d){
+    data = d;
+    rows = Object.keys(d.stocks).map(function(s){var o=d.stocks[s]; o.symbol=s; return o});
+    $("asof").textContent = "Prices to " + (d.prices_as_of||"unknown date") + ". Scores built " + (d.generated||"") + ".";
+    var c=$("credit"); c.textContent="Data: financials and some prices from ";
+    var a=el("a",null,"StockAnalysis.com"); a.href="https://stockanalysis.com/list/egyptian-stock-exchange/"; a.rel="noopener"; c.appendChild(a);
+    c.appendChild(document.createTextNode(", other prices from Yahoo Finance. Each stock links back to its StockAnalysis page for the full data."));
+    buildHead(); renderTable(); fromHash();
+  }).catch(function(e){
+    var box=$("err"); box.hidden=false;
+    box.textContent="Could not load the scores ("+e.message+"). Run python score_all.py to create docs/data/scores.json and scores.js, then reload.";
+  });
+
+  /* ---------- search */
+  function matches(term){
+    term = term.trim().toLowerCase(); if(!term) return [];
+    var out=[];
+    rows.forEach(function(r){
+      var s=r.symbol.toLowerCase(), n=r.name.toLowerCase();
+      var rank = s===term?0 : s.indexOf(term)===0?1 : n.indexOf(term)===0?2 : (s.indexOf(term)>-1||n.indexOf(term)>-1)?3 : -1;
+      if(rank>-1) out.push({r:r,rank:rank});
+    });
+    out.sort(function(a,b){return a.rank-b.rank || a.r.symbol.localeCompare(b.r.symbol)});
+    return out.slice(0,8).map(function(x){return x.r});
+  }
+  function closeSugg(){sugg.hidden=true; q.setAttribute("aria-expanded","false"); active=-1}
+  function openSugg(){
+    shown = matches(q.value); sugg.textContent="";
+    if(!q.value.trim()){closeSugg();return}
+    if(!shown.length){
+      var li=el("li",null,"No stock matches “"+q.value.trim()+"”. Try the ticker, for example COMI."); li.style.cursor="default"; sugg.appendChild(li);
+    }
+    shown.forEach(function(r,i){
+      var li=el("li"); li.setAttribute("role","option"); li.id="opt"+i;
+      li.appendChild(el("b",null,r.symbol)); li.appendChild(el("span",null,r.name));
+      li.addEventListener("mousedown",function(e){e.preventDefault(); choose(r.symbol)});
+      sugg.appendChild(li);
+    });
+    sugg.hidden=false; q.setAttribute("aria-expanded","true"); active=-1;
+  }
+  function setActive(i){
+    var items=sugg.querySelectorAll("li[role=option]"); if(!items.length) return;
+    active=(i+items.length)%items.length;
+    items.forEach(function(li,k){li.setAttribute("aria-selected",k===active?"true":"false")});
+    q.setAttribute("aria-activedescendant","opt"+active);
+  }
+  q.addEventListener("input",openSugg);
+  q.addEventListener("focus",function(){if(q.value) openSugg()});
+  q.addEventListener("blur",closeSugg);
+  q.addEventListener("keydown",function(e){
+    if(e.key==="ArrowDown"){e.preventDefault(); if(sugg.hidden) openSugg(); setActive(active+1)}
+    else if(e.key==="ArrowUp"){e.preventDefault(); setActive(active-1)}
+    else if(e.key==="Enter"){
+      e.preventDefault();
+      var pick = active>-1 ? shown[active] : shown[0];
+      if(pick) choose(pick.symbol);
+    } else if(e.key==="Escape"){closeSugg()}
+  });
+
+  function choose(sym){
+    closeSugg(); q.value="";
+    if(history.replaceState) history.replaceState(null,"","#"+sym); else location.hash=sym;
+    show(sym);
+    $("result").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth", block:"start"});
+  }
+  function fromHash(){
+    var s=decodeURIComponent(location.hash.slice(1)).toUpperCase();
+    if(s && data.stocks[s]) show(s);
+  }
+  window.addEventListener("hashchange",function(){if(data) fromHash()});
+
+  /* ---------- result card */
+  function show(sym){
+    var r=data.stocks[sym], box=$("result"); if(!r) return;
+    box.textContent=""; box.hidden=false;
+
+    var head=el("div","r-head"), left=el("div");
+    var h=el("h2",null,r.name+" "); h.appendChild(el("span","sym","("+sym+")")); left.appendChild(h);
+    var confText={high:"High confidence",medium:"Medium confidence",low:"Low confidence"}[r.confidence]||"Confidence unknown";
+    var cf=el("div","conf "+r.confidence); cf.appendChild(el("i")); cf.appendChild(document.createTextNode(confText+" ("+r.scores_available+" of 4 scores)"));
+    left.appendChild(cf); head.appendChild(left);
+    var ov=el("div","overall"); ov.appendChild(el("div","n", r.overall==null ? "n/a" : String(r.overall)));
+    ov.appendChild(el("div","l", r.overall==null ? "needs at least 3 scores" : "overall (simple average)"));
+    head.appendChild(ov); box.appendChild(head);
+
+    var ms=el("div","measures");
+    MEASURES.forEach(function(m){
+      var v=r.scores[m.key], wrap=el("div"), top=el("div","m-top");
+      top.appendChild(el("span","m-name",m.name));
+      top.appendChild(el("span","m-val"+(v==null?" na":""), v==null?"Not enough data":v+" / 100"));
+      wrap.appendChild(top);
+      var tr=el("div","track"+(v==null?" na":""));
+      tr.setAttribute("role","img"); tr.setAttribute("aria-label", m.name+": "+(v==null?"not enough data":v+" out of 100"));
+      if(v!=null){var f=el("div","fill"); f.style.width="0%"; tr.appendChild(f); requestAnimationFrame(function(){requestAnimationFrame(function(){f.style.width=v+"%"})})}
+      wrap.appendChild(tr); wrap.appendChild(el("p","m-desc",m.desc)); ms.appendChild(wrap);
+    });
+    box.appendChild(ms);
+
+    if(r.egx30){
+      var tb=el("div","notes ctx"); tb.appendChild(el("strong",null,"EGX 30 member"));
+      tb.appendChild(el("p",null,"This stock is one of the leading shares in the EGX 30 index. Large, heavily traded stocks are hard to move with a few trades, but short-term traders also gather here. A lower \u201CAway from speculators\u201D score on a stock like this reflects how busy its trading is, not the quality of the company. The score cannot tell you who is trading or why."));
+      box.appendChild(tb);
+    }
+    if(r.notes && r.notes.length){
+      var n=el("div","notes"); n.appendChild(el("strong",null,"Read with care"));
+      var ul=el("ul"); r.notes.forEach(function(t){ul.appendChild(el("li",null,t))}); n.appendChild(ul); box.appendChild(n);
+    }
+
+    var f=r.figures||{}, dl=el("dl","figs");
+    [["P/E", f.pe==null?"not available":fmt(f.pe,1)],
+     ["Dividend yield", fmt(f.dividend_yield_pct,1,"%")],
+     ["Real profit growth a year", fmt(f.real_profit_growth_per_year_pct,1,"%")],
+     ["Years profit beat inflation", f.years_profit_beat_inflation==null?"not available":Math.round(f.years_profit_beat_inflation*100)+"% of years"],
+     ["Average daily traded value", egp(f.avg_daily_traded_value_egp)],
+     ["Yearly price volatility", fmt(f.annual_volatility_pct,0,"%")],
+     ["Chart red flags", f.red_flags==null?"not available":String(f.red_flags)]
+    ].forEach(function(p){var d=el("div"); d.appendChild(el("dt",null,p[0])); d.appendChild(el("dd",null,p[1])); dl.appendChild(d)});
+    box.appendChild(dl);
+
+    var src=el("p","src"); src.appendChild(document.createTextNode("Full financials and charts for this stock: "));
+    var a=el("a",null,"StockAnalysis.com"); a.href=r.link; a.rel="noopener"; src.appendChild(a); box.appendChild(src);
+  }
+
+  /* ---------- table */
+  var COLS=[{k:"symbol",t:"Stock"}].concat(MEASURES.map(function(m){return {k:m.key,t:m.short}})).concat([{k:"overall",t:"Overall"},{k:"confidence",t:"Confidence"}]);
+  function val(r,k){return k==="symbol"?r.symbol : k==="overall"?r.overall : k==="confidence"?({high:3,medium:2,low:1}[r.confidence]||0) : r.scores[k]}
+  function buildHead(){
+    var tr=$("thead"); tr.textContent="";
+    COLS.forEach(function(c){
+      var th=el("th"); th.scope="col";
+      th.setAttribute("aria-sort", c.k===sortKey?(sortDir>0?"ascending":"descending"):"none");
+      var b=el("button",null,c.t); b.type="button";
+      b.addEventListener("click",function(){
+        if(sortKey===c.k) sortDir=-sortDir; else {sortKey=c.k; sortDir=c.k==="symbol"?1:-1}
+        buildHead(); renderTable();
+      });
+      th.appendChild(b); tr.appendChild(th);
+    });
+  }
+  function renderTable(){
+    var onlyConf=$("onlyConf").checked, min=Number($("minOverall").value)||0;
+    var list=rows.filter(function(r){
+      if(onlyConf && r.confidence==="low") return false;
+      if(min>0 && (r.overall==null || r.overall<min)) return false;
+      return true;
+    });
+    list.sort(function(a,b){
+      var x=val(a,sortKey), y=val(b,sortKey);
+      if(x==null && y==null) return a.symbol.localeCompare(b.symbol);
+      if(x==null) return 1; if(y==null) return -1;   // missing always last
+      if(typeof x==="string") return sortDir*x.localeCompare(y);
+      return sortDir*(x-y) || a.symbol.localeCompare(b.symbol);
+    });
+    var tb=$("tbody"); tb.textContent="";
+    list.forEach(function(r){
+      var tr=el("tr"), td=el("td");
+      var b=el("button","pick",r.symbol); b.type="button"; b.addEventListener("click",function(){choose(r.symbol)});
+      td.appendChild(b); td.appendChild(el("span","tname",r.name)); tr.appendChild(td);
+      MEASURES.map(function(m){return r.scores[m.key]}).concat([r.overall]).forEach(function(v){
+        tr.appendChild(el("td",v==null?"na":"", v==null?"n/a":String(v)));
+      });
+      var c=el("td"); c.style.textAlign="right"; c.appendChild(el("span","cdot "+r.confidence)); c.appendChild(document.createTextNode(r.confidence)); tr.appendChild(c);
+      tb.appendChild(tr);
+    });
+    if(!list.length){var tr=el("tr"), td=el("td","empty","No stocks match these filters. Lower the minimum score or untick the confidence filter."); td.colSpan=COLS.length; td.style.textAlign="center"; tr.appendChild(td); tb.appendChild(tr)}
+    $("count").textContent="Showing "+list.length+" of "+rows.length+" stocks.";
+  }
+  $("onlyConf").addEventListener("change",renderTable);
+  $("minOverall").addEventListener("input",renderTable);
+})();
+</script>
+</body>
+</html>

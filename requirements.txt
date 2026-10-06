@@ -1,0 +1,7 @@
+yfinance
+pandas
+numpy
+requests
+beautifulsoup4
+lxml
+playwright

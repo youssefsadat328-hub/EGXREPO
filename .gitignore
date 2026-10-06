@@ -1,0 +1,12 @@
+# Python / environment
+.venv/
+__pycache__/
+*.pyc
+
+# Pages downloaded from StockAnalysis.com. Their terms do not allow republishing
+# their content in full, so these stay on your computer and out of the public repo.
+data/html/
+# Cached prices and raw fundamentals (rebuilt by the scripts)
+data/raw/
+# Per-stock diagnostics (every number behind every score) - keep private
+data/out/
